@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Poznej Temelín</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    @font-face { font-family: 'Roobert CEZ'; font-weight: 300; src: url('fonts/RoobertCEZ/RoobertCEZ-Light.otf') format('opentype'); }
+    @font-face { font-family: 'Roobert CEZ'; font-weight: 400; src: url('fonts/RoobertCEZ/RoobertCEZ-Regular.otf') format('opentype'); }
+    @font-face { font-family: 'Roobert CEZ'; font-weight: 500; src: url('fonts/RoobertCEZ/RoobertCEZ-Medium.otf') format('opentype'); }
+    @font-face { font-family: 'Roobert CEZ'; font-weight: 600; src: url('fonts/RoobertCEZ/RoobertCEZ-SemiBold.otf') format('opentype'); }
+    @font-face { font-family: 'Roobert CEZ'; font-weight: 700; src: url('fonts/RoobertCEZ/RoobertCEZ-Bold.otf') format('opentype'); }
+    @font-face { font-family: 'Roobert CEZ'; font-weight: 900; src: url('fonts/RoobertCEZ/RoobertCEZ-Heavy.otf') format('opentype'); }
+
+    :root {
+      --green: #00c752;
+      --red:   #e03030;
+      --font:  'Roobert CEZ', system-ui, sans-serif;
+    }
+
+    html, body { height: 100%; overflow: hidden; font-family: var(--font); background: #1a1a1a; }
+
+    .screen { position: fixed; inset: 0; display: none; }
+    .screen.active { display: block; }
+
+    /* Shared: photo background (menu only) */
+    .bg-photo {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      object-fit: cover; object-position: center;
+    }
+    .bg-vignette {
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 136% 77% at 50% 50%, rgba(0,0,0,0) 0%, rgba(0,0,0,0.15) 83%);
+    }
+
+    /* CEZ brand stripe — rozcestník only */
+    .cez-stripe {
+      position: absolute; left: 0; top: 38.52%;
+      width: clamp(6px, 0.63vw, 12px); height: 16.3%;
+      display: flex; flex-direction: column; z-index: 2;
+    }
+    .cez-stripe span:first-child { flex: 1; background: var(--green); }
+    .cez-stripe span:last-child  { flex: 1; background: #F24F00; }
+
+    /* Shared: "Ukončit hru" — absolute bottom-right on all game screens */
+    .quit-btn {
+      position: absolute;
+      right: clamp(20px, 4vw, 70px);
+      bottom: clamp(20px, 5.5vh, 50px);
+      background: var(--green);
+      border: none; cursor: pointer;
+      font-family: var(--font); font-weight: 700;
+      font-size: clamp(14px, 1.75vw, 34px);
+      color: #fff;
+      padding: clamp(14px, 2vh, 28px) clamp(24px, 3.6vw, 65px);
+      z-index: 20;
+      white-space: nowrap;
+      transition: filter 0.15s;
+    }
+    .quit-btn:hover { filter: brightness(1.12); }
+
+    /* ═══════════════════════════════════════════════════════
+       SCREEN 1 — ROZCESTNÍK
+    ═══════════════════════════════════════════════════════ */
+    #screen-menu { z-index: 10; }
+
+    .menu-title {
+      position: absolute;
+      top: calc(33.33% + clamp(12px, 2.22vh, 24px));
+      left: clamp(40px, 5.625vw, 108px);
+      font-weight: 300;
+      font-size: clamp(36px, 5.71vw, 109.66px);
+      line-height: 1.143; color: #fff; z-index: 2; white-space: nowrap;
+    }
+
+    .menu-buttons {
+      position: absolute;
+      top: calc(50% + clamp(30px, 7.41vh, 80px));
+      left: clamp(40px, 5.3125vw, 102px);
+      display: flex;
+      gap: clamp(12px, 1.98vw, 38px);
+      z-index: 2;
+    }
+    .menu-btn {
+      width:  clamp(200px, 30vw, 576px);
+      height: clamp(60px, 12.78vh, 138px);
+      background: rgba(0,0,0,0.2);
+      border: 1px solid rgba(255,255,255,0.9);
+      color: #fff; font-family: var(--font); font-weight: 400;
+      font-size: clamp(13px, 1.41vw, 27px);
+      text-align: center; cursor: pointer;
+      transition: background 0.18s; line-height: 1.147; padding: 0 16px;
+    }
+    .menu-btn:hover { background: rgba(0,0,0,0.45); }
+
+    /* ═══════════════════════════════════════════════════════
+       SCREEN 2 — MODEL
+    ═══════════════════════════════════════════════════════ */
+    #screen-model {
+      z-index: 9;
+      background-color: #2b2b2b;
+    }
+    .model-inner {
+      position: absolute; inset: 0;
+      padding: clamp(24px, 4vh, 56px) clamp(24px, 3.5vw, 60px);
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .tile-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: clamp(5px, 0.78vw, 14px);
+      width: 100%; max-width: 1720px;
+    }
+
+    .tile {
+      height: clamp(55px, 9.26vh, 100px);
+      background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.85);
+      display: flex; align-items: center; justify-content: center;
+      padding: 0 clamp(8px, 1.25vw, 22px);
+      cursor: pointer; transition: background 0.15s; user-select: none;
+    }
+    .tile:hover { background: rgba(255,255,255,0.07); }
+
+    .tile-label {
+      font-weight: 400;
+      font-size: clamp(9px, 1.2vw, 23px);
+      line-height: 1.15; color: #fff; text-align: center;
+    }
+
+    /* ── Model overlay ──────────────────────────────────── */
+    .overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.6);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none; transition: opacity 0.22s;
+    }
+    .overlay.visible { opacity: 1; pointer-events: all; }
+
+    .overlay-card {
+      position: relative;
+      width: min(77.9vw, 1496px);
+      height: clamp(360px, 69.2vh, 747px);
+      background: #000;
+      border: 1px solid rgba(255,255,255,0.9);
+      overflow: hidden;
+      transform: translateY(16px); transition: transform 0.22s;
+    }
+    .overlay.visible .overlay-card { transform: translateY(0); }
+
+    .overlay-card-bg {
+      position: absolute; inset: 0;
+      background-image: url('assets/bg-card.jpg');
+      background-size: cover; background-position: center;
+    }
+    .overlay-card-bg::after {
+      content: ''; position: absolute; inset: 0; background: rgba(0,0,0,0.75);
+    }
+
+    .overlay-close {
+      position: absolute; top: 14.32%; left: 4.68%;
+      width: clamp(28px, 2.19vw, 42px); height: clamp(28px, 2.19vw, 42px);
+      background: none; border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.15s; z-index: 2;
+    }
+    .overlay-close:hover { transform: scale(1.15); }
+    .overlay-close svg { width: 100%; height: 100%; }
+
+    .overlay-inner {
+      position: absolute; top: 26.64%; left: 18.45%; right: 18.38%; bottom: 0; z-index: 1;
+    }
+    .overlay-title {
+      font-weight: 400;
+      font-size: clamp(22px, 3.53vw, 68px);
+      line-height: 1.147; color: #fff; margin-bottom: 6%;
+    }
+    .overlay-desc {
+      font-weight: 400;
+      font-size: clamp(13px, 1.77vw, 34px);
+      line-height: 1.5; color: #fff;
+    }
+
+    /* ═══════════════════════════════════════════════════════
+       SCREEN 3 — QUIZ PICK
+    ═══════════════════════════════════════════════════════ */
+    #screen-quiz-pick {
+      z-index: 8;
+      background-color: #2b2b2b;
+    }
+
+    /* 5 bordered tiles in a single row, vertically centered */
+    .quiz-pick-tiles {
+      position: absolute;
+      top: 50%; left: 0; right: 0;
+      transform: translateY(-50%);
+      display: flex;
+      justify-content: center;
+      gap: clamp(6px, 1vw, 15px);
+      padding: 0 clamp(20px, 6.2vw, 90px);
+      z-index: 1;
+    }
+
+    .cat-tile-btn {
+      flex: 1;
+      max-width: clamp(180px, 17vw, 250px);
+      height: clamp(100px, 19vh, 155px);
+      background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.85);
+      display: flex; align-items: center; justify-content: center;
+      padding: 0 clamp(8px, 1.2vw, 18px);
+      cursor: pointer;
+      font-family: var(--font); font-weight: 400;
+      font-size: clamp(12px, 1.5vw, 24px);
+      color: #fff; text-align: center; line-height: 1.3;
+      transition: background 0.15s;
+    }
+    .cat-tile-btn:hover { background: rgba(255,255,255,0.07); }
+
+    /* ── Confirmation overlay (předčasný konec) ─────────── */
+    .confirm-overlay {
+      position: fixed; inset: 0; z-index: 300;
+      background: rgba(50,50,50,0.82);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none; transition: opacity 0.18s;
+    }
+    .confirm-overlay.visible { opacity: 1; pointer-events: all; }
+
+    .confirm-card {
+      width: min(57.8vw, 842px);
+      background: #3c3c3c;
+      padding: clamp(40px, 5.5vh, 70px) clamp(30px, 4vw, 60px) clamp(32px, 4.5vh, 56px);
+      display: flex; flex-direction: column;
+      align-items: center; gap: clamp(24px, 3.5vh, 42px);
+    }
+
+    .confirm-title {
+      font-weight: 300;
+      font-size: clamp(20px, 2.3vw, 44px);
+      color: #fff; text-align: center; line-height: 1.2;
+    }
+
+    .confirm-btns {
+      display: flex;
+      gap: clamp(20px, 3.9vw, 57px);
+    }
+    .confirm-btn {
+      width: clamp(160px, 19.6vw, 285px);
+      height: clamp(46px, 8.3vh, 68px);
+      background: var(--green);
+      border: none; cursor: pointer;
+      font-family: var(--font); font-weight: 700;
+      font-size: clamp(13px, 1.6vw, 26px);
+      color: #fff; transition: filter 0.15s;
+    }
+    .confirm-btn:hover { filter: brightness(1.12); }
+
+    /* ═══════════════════════════════════════════════════════
+       SCREEN 4 — QUIZ PLAY
+    ═══════════════════════════════════════════════════════ */
+    #screen-quiz-play {
+      z-index: 7;
+      background-color: #2b2b2b;
+    }
+
+    /* Green ✕ — top-left */
+    .quiz-close {
+      position: absolute;
+      top: clamp(18px, 3.5vh, 46px);
+      left: clamp(18px, 2.8vw, 50px);
+      width: clamp(34px, 3.2vw, 56px);
+      height: clamp(34px, 3.2vw, 56px);
+      background: none; border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 20; transition: transform 0.15s;
+    }
+    .quiz-close:hover { transform: scale(1.15); }
+    .quiz-close svg { width: 100%; height: 100%; }
+
+    /* Counter + question — centered block starting from ~28% top */
+    .quiz-header {
+      position: absolute;
+      top: 28%;
+      left: 0; right: 0;
+      text-align: center;
+      z-index: 1;
+    }
+    .quiz-counter {
+      font-weight: 400;
+      font-size: clamp(14px, 1.3vw, 26px);
+      color: rgba(255,255,255,0.85);
+      margin-bottom: clamp(6px, 0.9vh, 14px);
+      letter-spacing: 0.02em;
+    }
+    .quiz-question {
+      font-weight: 300;
+      font-size: clamp(22px, 3.6vw, 64px);
+      color: #fff; line-height: 1.15;
+    }
+
+    /* Tile grid for quiz answers — centered below header */
+    .quiz-tiles-wrap {
+      position: absolute;
+      top: 47%;
+      left: 5%; right: 5%;
+      display: flex; justify-content: center;
+      z-index: 1;
+    }
+
+    .quiz-tiles {
+      display: grid;
+      gap: clamp(6px, 0.9vw, 14px);
+      width: 100%;
+      max-width: clamp(600px, 78vw, 1200px);
+    }
+
+    .quiz-tile {
+      height: clamp(56px, 8.5vh, 95px);
+      background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.85);
+      display: flex; align-items: center; justify-content: center;
+      padding: 0 clamp(8px, 1.2vw, 20px);
+      cursor: pointer; transition: background 0.15s, border-color 0.15s;
+      font-family: var(--font); font-weight: 400;
+      font-size: clamp(10px, 1.2vw, 22px);
+      color: #fff; text-align: center; line-height: 1.2;
+      user-select: none;
+    }
+    .quiz-tile:hover:not(:disabled) { background: rgba(255,255,255,0.07); }
+    .quiz-tile:disabled { cursor: default; }
+
+    .quiz-tile.correct {
+      background: var(--green);
+      border-color: var(--green);
+    }
+    .quiz-tile.wrong {
+      background: var(--red);
+      border-color: var(--red);
+    }
+
+    /* Results screen */
+    #screen-results { background-color: #2b2b2b; }
+    .results-content {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -52%);
+      text-align: center;
+      width: 90%;
+    }
+    .results-label {
+      font-weight: 300;
+      font-size: clamp(16px, 2vw, 38px);
+      color: rgba(255,255,255,0.9);
+      margin-bottom: clamp(16px, 2.8vh, 44px);
+      letter-spacing: 0.01em;
+    }
+    .results-score {
+      font-weight: 300;
+      font-size: clamp(72px, 10.4vw, 200px);
+      color: #fff;
+      line-height: 1;
+      letter-spacing: -0.01em;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════
+     SCREEN 1 — ROZCESTNÍK
+═══════════════════════════════════════════════════════ -->
+<div class="screen active" id="screen-menu">
+  <img class="bg-photo" src="assets/bg-temelin.jpg" alt="Elektrárna Temelín">
+  <div class="bg-vignette"></div>
+  <div class="cez-stripe"><span></span><span></span></div>
+
+  <h1 class="menu-title">Poznej Temelín</h1>
+
+  <div class="menu-buttons">
+    <button class="menu-btn" id="btn-model">Prozkoumej jadernou elektrárnu</button>
+    <button class="menu-btn" id="btn-quiz">Jak dobře znáš Temelín?</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SCREEN 2 — MODEL
+═══════════════════════════════════════════════════════ -->
+<div class="screen" id="screen-model">
+  <div class="model-inner">
+    <div class="tile-grid" id="tile-grid"></div>
+  </div>
+  <button class="quit-btn" id="model-quit">Ukončit hru</button>
+</div>
+
+<!-- Model detail overlay -->
+<div class="overlay" id="model-overlay" role="dialog" aria-modal="true" aria-labelledby="model-title">
+  <div class="overlay-card" id="model-card">
+    <div class="overlay-card-bg" aria-hidden="true"></div>
+    <button class="overlay-close" id="model-close" aria-label="Zavřít">
+      <svg viewBox="0 0 42 42" fill="none" stroke="#00c752" stroke-width="3.5" stroke-linecap="round">
+        <line x1="5" y1="5" x2="37" y2="37"/>
+        <line x1="37" y1="5" x2="5" y2="37"/>
+      </svg>
+    </button>
+    <div class="overlay-inner">
+      <div class="overlay-title" id="model-title"></div>
+      <div class="overlay-desc"  id="model-desc"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SCREEN 3 — QUIZ PICK
+═══════════════════════════════════════════════════════ -->
+<div class="screen" id="screen-quiz-pick">
+  <div class="quiz-pick-tiles" id="quiz-pick-tiles"></div>
+  <button class="quit-btn" id="quiz-pick-quit">Ukončit hru</button>
+</div>
+
+<!-- Confirmation overlay — předčasný konec -->
+<div class="confirm-overlay" id="confirm-overlay">
+  <div class="confirm-card">
+    <div class="confirm-title">Opravdu chceš ukončit hru?</div>
+    <div class="confirm-btns">
+      <button class="confirm-btn" id="confirm-continue">Pokračovat ve hře</button>
+      <button class="confirm-btn" id="confirm-quit">Ukončit hru</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SCREEN 4 — QUIZ PLAY
+═══════════════════════════════════════════════════════ -->
+<div class="screen" id="screen-quiz-play">
+  <button class="quiz-close" id="quiz-close" aria-label="Zpět na výběr">
+    <svg viewBox="0 0 56 56" fill="none" stroke="#00c752" stroke-width="4.5" stroke-linecap="round">
+      <line x1="6" y1="6" x2="50" y2="50"/>
+      <line x1="50" y1="6" x2="6" y2="50"/>
+    </svg>
+  </button>
+
+  <div class="quiz-header">
+    <div class="quiz-counter" id="quiz-counter">0/0</div>
+    <div class="quiz-question" id="quiz-question">Která část modelu se rozsvítila?</div>
+  </div>
+
+  <div class="quiz-tiles-wrap">
+    <div class="quiz-tiles" id="quiz-tiles"></div>
+  </div>
+
+  <button class="quit-btn" id="quiz-play-quit">Ukončit hru</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     SCREEN 5 — VÝSLEDKY
+═══════════════════════════════════════════════════════ -->
+<div class="screen" id="screen-results">
+  <div class="results-content">
+    <div class="results-label">Dobrá práce! Tvůj finální počet bodů je:</div>
+    <div class="results-score" id="results-score">0/0</div>
+  </div>
+  <button class="quit-btn" id="results-quit">Ukončit hru</button>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   LED API — REST akce + WebSocket stavové eventy
+   Aplikace je servírovaná z API backendu → relativní URL.
+   Frontend je „hloupý": jen posílá activate a reaguje na eventy.
+═══════════════════════════════════════════════════════════ */
+const IDLE_SCENE = 'idle';
+
+const API = {
+  scenes:   ()   => fetch('/api/scenes').then(r => r.json()),
+  state:    ()   => fetch('/api/state').then(r => r.json()),
+  activate: (id) => fetch(`/api/scenes/${id}/activate`, { method: 'POST' })
+                      .catch(err => console.warn('[API] activate selhalo:', id, err)),
+};
+
+/* Stav synchronizovaný s backendem */
+let sceneByObjectId = {};   // object_id (1–27) → scene_id
+let activeScene     = IDLE_SCENE;
+let apiOnline       = false;
+
+/* Rozsvítí scénu odpovídající objektu (dle jeho čísla n). */
+function activateObject(n) {
+  const scene = sceneByObjectId[n];
+  if (scene) { API.activate(scene); activeScene = scene; }
+}
+/* Zhasne (návrat do klidové scény). */
+function activateIdle() {
+  API.activate(IDLE_SCENE);
+  activeScene = IDLE_SCENE;
+}
+/* Toggle dle spec 3.5: klik na už aktivní scénu → idle. */
+function toggleObject(n) {
+  const scene = sceneByObjectId[n];
+  if (scene && scene === activeScene) { activateIdle(); return false; }
+  activateObject(n);
+  return true;
+}
+
+/* ── WebSocket: backend → frontend stavové eventy ── */
+function connectEvents() {
+  let ws;
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  try {
+    ws = new WebSocket(`${proto}://${location.host}/api/events`);
+  } catch (err) {
+    console.warn('[WS] nelze otevřít:', err);
+    return;
+  }
+  ws.addEventListener('message', ev => {
+    let msg;
+    try { msg = JSON.parse(ev.data); } catch { return; }
+    handleEvent(msg);
+  });
+  ws.addEventListener('close', () => setTimeout(connectEvents, 2000));
+  ws.addEventListener('error', () => ws.close());
+}
+
+function handleEvent(msg) {
+  if (msg.type === 'scene_changed') {
+    activeScene = msg.scene;
+    if (msg.reason === 'timeout') {
+      if (quizActive && currentCorrect) {
+        /* Kvíz běží — auto-return by zhasl hádanou sekci; znovu ji rozsvítit. */
+        activateObject(currentCorrect.n);
+      } else {
+        /* auto-return po nečinnosti v modelu */
+        overlay.classList.remove('visible');
+      }
+    } else if (msg.reason === 'reload') {
+      /* config se přenačetl — obnovit mapu scén, zavřít overlay */
+      overlay.classList.remove('visible');
+      loadScenes();
+    }
+  }
+}
+
+/* ── Init: načtení scén + stavu, připojení WS ── */
+async function loadScenes() {
+  try {
+    const scenes = await API.scenes();
+    const map = {};
+    scenes.forEach(s => { if (s.object_id != null) map[s.object_id] = s.id; });
+    sceneByObjectId = map;
+    apiOnline = true;
+  } catch (err) {
+    console.warn('[API] GET /api/scenes selhalo — offline režim (jen GUI):', err);
+    apiOnline = false;
+  }
+}
+
+async function initApi() {
+  await loadScenes();
+  try {
+    const st = await API.state();
+    if (st && st.active_scene) activeScene = st.active_scene;
+  } catch (err) {
+    console.warn('[API] GET /api/state selhalo:', err);
+  }
+  connectEvents();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   DATA — 27 items in model grid order (n = grid position)
+═══════════════════════════════════════════════════════════ */
+const ITEMS = [
+  { n:1,  label:'Kalové hospodářství',
+    desc:'Slouží k odvodnění a čištění odpadních vod z elektrárny.',
+    cat:'podpurne' },
+  { n:2,  label:'Úpravna chladicí vody',
+    desc:'Má za úkol čištění vody pro chladicí věže a celý chladicí okruh.',
+    cat:'podpurne' },
+  { n:3,  label:'Vodojem surové vody 2× 15 000 m³',
+    desc:'Velká nádrž, kde se shromažďuje voda z řeky pro technologickou potřebu elektrárny.',
+    cat:'chladici' },
+  { n:4,  label:'Čerpací stanice chladicí vody I. výrobního bloku',
+    desc:'Největší čerpadla elektrárny ženou vodu z kondenzátoru I. bloku do chladicí věže.',
+    cat:'prim1' },
+  { n:5,  label:'Čerpací stanice chladicí vody II. výrobního bloku',
+    desc:'Největší čerpadla elektrárny ženou vodu z kondenzátoru II. bloku do chladicí věže.',
+    cat:'prim2' },
+  { n:6,  label:'Chladicí věž',
+    desc:'Slouží k chlazení vody z kondenzátoru. Výška temelínských věží je 155 metrů.',
+    cat:'chladici' },
+  { n:7,  label:'Strojovna I. bloku',
+    desc:'Nachází se zde turbína a generátor — hlavní zařízení sekundárního okruhu I. bloku.',
+    cat:'prim1' },
+  { n:8,  label:'Strojovna II. bloku',
+    desc:'Nachází se zde turbína a generátor — hlavní zařízení sekundárního okruhu II. bloku.',
+    cat:'prim2' },
+  { n:9,  label:'Ústřední elektrická dozorna',
+    desc:'Řídicí pracoviště, kde směnový inženýr řídí chod celé elektrárny.',
+    cat:'chladici' },
+  { n:10, label:'Provozní budovy',
+    desc:'Zázemí pro elektrikáře, měření a regulaci — personál obsluhující výrobní blok.',
+    cat:'podpurne' },
+  { n:11, label:'Reaktorovna I. výrobního bloku',
+    desc:'Kontejnment — ochranná obálka reaktoru a primárního okruhu. Uvnitř je bloková dozorna.',
+    cat:'prim1' },
+  { n:12, label:'Dieselgenerátorová stanice I. a II. výrobního bloku',
+    desc:'Záložní zdroj elektřiny. Celkem 8 obrovských naftových motorů.',
+    cat:'chladici' },
+  { n:13, label:'Reaktorovna II. výrobního bloku',
+    desc:'Kontejnment II. bloku — ochranná obálka reaktoru s blokovou dozornou.',
+    cat:'prim2' },
+  { n:14, label:'Chemická úpravna vody',
+    desc:'Vyrábí demineralizovanou (čistou a lehkou) vodu pro primární a sekundární okruh.',
+    cat:'chladici' },
+  { n:15, label:'Nízkotlaká kompresorová stanice a stanice zdroje chladu',
+    desc:'Zdroj studené vody pro chlazení elektrických zařízení, jako jsou elektrické rozvodny.',
+    cat:'podpurne' },
+  { n:16, label:'Naftové a olejové hospodářství',
+    desc:'Nádrže, ve kterých je nafta pro záložní dieselgenerátory a olej pro zařízení ve strojovně.',
+    cat:'podpurne' },
+  { n:17, label:'Sklad chemikálií a neutralizace',
+    desc:'Nádrže s chemikáliemi pro docílení správné kvality vody v jednotlivých okruzích.',
+    cat:'podpurne' },
+  { n:18, label:'Budova aktivních a pomocných provozů',
+    desc:'Sklad čerstvého paliva, šatny pro žlutý oděv, aktivní dílny, čistírna aktivních vod.',
+    cat:'palivovy' },
+  { n:19, label:'Plynová kotelna',
+    desc:'Záložní zdroj tepla potřebného k provozu bloku.',
+    cat:'podpurne' },
+  { n:20, label:'Hlavní technologické dílny',
+    desc:'Nachází se zde pomocné dílny jako truhlárna, kovárna či svařovna.',
+    cat:'podpurne' },
+  { n:21, label:'Výcvikové středisko',
+    desc:'Nachází se zde věrná kopie blokové dozorny určená pro výcvik operátorů.',
+    cat:'chladici' },
+  { n:22, label:'Chladicí nádrž s rozstříkem',
+    desc:'Bazény, kde chladíme vodu pro zchlazení zařízení důležitých z hlediska jaderné bezpečnosti.',
+    cat:'chladici' },
+  { n:23, label:'Požární stanice',
+    desc:'Zázemí pro podnikové hasiče elektrárny a jejich techniku.',
+    cat:'chladici' },
+  { n:24, label:'Administrativní budova',
+    desc:'Jediný vstup do elektrárny a sídlo ředitelství a administrativní podpory.',
+    cat:'podpurne' },
+  { n:25, label:'Řídicí centrum ostrahy',
+    desc:'Místo, odkud se sleduje bezpečnost areálu a koordinuje činnost ostrahy.',
+    cat:'chladici' },
+  { n:26, label:'Čistírna odpadních vod',
+    desc:'Zařízení, kde se čistí použitá voda, aby se mohla vrátit zpátky do řeky Vltavy.',
+    cat:'podpurne' },
+  { n:27, label:'Mezisklad použitého jaderného paliva',
+    desc:'Bezpečné uložení použitého paliva než se rozhodne o jeho dalším zpracování.',
+    cat:'palivovy' },
+];
+
+/* ═══════════════════════════════════════════════════════════
+   KONFIGURACE KVÍZU — kategorie → otázky (object_id z ITEMS).
+   Otázka rozsvítí sekci na modelu (přes sceneByObjectId), hráč
+   hádá, která to je. Texty dlaždic se berou z ITEMS podle n.
+═══════════════════════════════════════════════════════════ */
+const QUIZ_CONFIG = {
+  question: 'Která část modelu se rozsvítila?',
+  categories: [
+    { id:'prim1',    label:'Primární a sekundární okruh I',  questions:[4, 7, 11] },
+    { id:'prim2',    label:'Primární a sekundární okruh II', questions:[5, 8, 13] },
+    { id:'chladici', label:'Chladicí okruh',                 questions:[3, 6, 9, 12, 14, 21, 22, 23, 25] },
+    { id:'podpurne', label:'Podpůrné provozy',               questions:[1, 2, 10, 15, 16, 17, 19, 20, 24, 26] },
+    { id:'palivovy', label:'Palivový cyklus',                questions:[18, 27] },
+  ],
+};
+
+/* Rychlé vyhledání objektu podle čísla n. */
+const ITEM_BY_N = Object.fromEntries(ITEMS.map(it => [it.n, it]));
+
+/* ═══════════════════════════════════════════════════════════
+   NAVIGATION
+═══════════════════════════════════════════════════════════ */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+document.getElementById('btn-model').addEventListener('click', () => showScreen('screen-model'));
+document.getElementById('btn-quiz').addEventListener('click',  () => showScreen('screen-quiz-pick'));
+document.getElementById('quiz-pick-quit').addEventListener('click', () => showScreen('screen-menu'));
+document.getElementById('quiz-play-quit').addEventListener('click', () => showConfirm());
+document.getElementById('quiz-close').addEventListener('click', () => { exitQuiz(); showScreen('screen-quiz-pick'); });
+
+/* Confirmation overlay */
+const confirmOverlay = document.getElementById('confirm-overlay');
+function showConfirm() {
+  stopQuiz();
+  confirmOverlay.classList.add('visible');
+}
+document.getElementById('confirm-continue').addEventListener('click', () => {
+  confirmOverlay.classList.remove('visible');
+  /* restart 5-second auto-advance for current answer state */
+  quizTimer = setTimeout(() => renderQuestion(), 5000);
+});
+document.getElementById('confirm-quit').addEventListener('click', () => {
+  confirmOverlay.classList.remove('visible');
+  exitQuiz();
+  showScreen('screen-menu');
+});
+document.getElementById('results-quit').addEventListener('click', () => { activateIdle(); showScreen('screen-menu'); });
+
+/* ═══════════════════════════════════════════════════════════
+   SCREEN 2 — MODEL GRID
+═══════════════════════════════════════════════════════════ */
+const grid       = document.getElementById('tile-grid');
+const overlay    = document.getElementById('model-overlay');
+const modelCard  = document.getElementById('model-card');
+const modelClose = document.getElementById('model-close');
+const modelTitle = document.getElementById('model-title');
+const modelDesc  = document.getElementById('model-desc');
+
+ITEMS.forEach(item => {
+  const tile = document.createElement('div');
+  tile.className = 'tile';
+  tile.setAttribute('role', 'button');
+  tile.setAttribute('tabindex', '0');
+  tile.setAttribute('aria-label', item.label);
+  tile.innerHTML = `<div class="tile-label">${item.label}</div>`;
+  tile.addEventListener('click', () => {
+    /* Toggle: druhý klik na svítící objekt ho zhasne a zavře overlay. */
+    const turnedOn = toggleObject(item.n);
+    if (turnedOn) {
+      modelTitle.textContent = item.label;
+      modelDesc.textContent  = item.desc;
+      overlay.classList.add('visible');
+      modelClose.focus();
+    } else {
+      overlay.classList.remove('visible');
+    }
+  });
+  tile.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') tile.click(); });
+  grid.appendChild(tile);
+});
+
+// "Ukončit hru" — absolutně vpravo dole, shodně s kvízem
+document.getElementById('model-quit').addEventListener('click', () => { activateIdle(); showScreen('screen-menu'); });
+
+/* Zavření overlay = zhasnutí objektu (návrat do klidu). */
+function closeModelOverlay() {
+  overlay.classList.remove('visible');
+  activateIdle();
+}
+modelClose.addEventListener('click', closeModelOverlay);
+overlay.addEventListener('click', e => { if (!modelCard.contains(e.target)) closeModelOverlay(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && overlay.classList.contains('visible')) closeModelOverlay();
+});
+
+/* ═══════════════════════════════════════════════════════════
+   SCREEN 3 — CATEGORY PICKER
+═══════════════════════════════════════════════════════════ */
+const tilesContainer = document.getElementById('quiz-pick-tiles');
+QUIZ_CONFIG.categories.forEach(cat => {
+  const btn = document.createElement('button');
+  btn.className = 'cat-tile-btn';
+  btn.textContent = cat.label;
+  btn.addEventListener('click', () => startQuiz(cat.id));
+  tilesContainer.appendChild(btn);
+});
+
+/* ═══════════════════════════════════════════════════════════
+   SCREEN 4 — QUIZ PLAY
+═══════════════════════════════════════════════════════════ */
+let quizPool       = [];
+let quizIndex      = 0;
+let answered       = 0;
+let correctCount   = 0;
+let quizTimer      = null;
+let currentCorrect = null;   // objekt aktuální otázky (pro re-aktivaci scény)
+let quizActive     = false;  // hráč je v běžící otázce (kvůli WS timeoutu)
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function stopQuiz() {
+  clearTimeout(quizTimer);
+  quizTimer = null;
+}
+
+/* Úplné opuštění kvízu — zastaví časovač a zhasne model. */
+function exitQuiz() {
+  stopQuiz();
+  quizActive     = false;
+  currentCorrect = null;
+  activateIdle();
+}
+
+function startQuiz(categoryId) {
+  stopQuiz();
+  const cat = QUIZ_CONFIG.categories.find(c => c.id === categoryId);
+  const catItems = cat.questions.map(n => ITEM_BY_N[n]).filter(Boolean);
+  quizPool      = shuffle(catItems);
+  quizIndex     = 0;
+  answered      = 0;
+  correctCount  = 0;
+  showScreen('screen-quiz-play');
+  renderQuestion();
+}
+
+function renderQuestion() {
+  if (quizIndex >= quizPool.length) {
+    quizActive     = false;
+    currentCorrect = null;
+    activateIdle();            /* konec kvízu → zhasnout model */
+    document.getElementById('results-score').textContent = `${correctCount}/${quizPool.length}`;
+    showScreen('screen-results');
+    return;
+  }
+
+  const total   = quizPool.length;
+  const correct = quizPool[quizIndex];
+  currentCorrect = correct;
+  quizActive     = true;
+
+  /* Rozsvítit na modelu sekci správné odpovědi — hráč hádá, která to je. */
+  activateObject(correct.n);
+
+  /* Determine grid columns by item count */
+  const cols = total <= 4 ? 2 : total <= 12 ? 3 : 4;
+
+  /* Question text + counter */
+  document.getElementById('quiz-question').textContent = QUIZ_CONFIG.question;
+  document.getElementById('quiz-counter').textContent = `${quizIndex + 1}/${total}`;
+
+  /* Build tile grid */
+  const tilesEl = document.getElementById('quiz-tiles');
+  tilesEl.innerHTML = '';
+  tilesEl.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+
+  /* Shuffle the order the tiles appear */
+  const pool = quizPool.length > 1
+    ? shuffle(quizPool)
+    : quizPool;
+
+  pool.forEach(item => {
+    const btn = document.createElement('button');
+    btn.className = 'quiz-tile';
+    btn.textContent = item.label;
+    btn.dataset.n = item.n;
+    btn.addEventListener('click', () => handleAnswer(item, correct));
+    tilesEl.appendChild(btn);
+  });
+}
+
+function handleAnswer(chosen, correct) {
+  const isCorrect = chosen.n === correct.n;
+
+  /* Lock all tiles */
+  const tilesEl = document.getElementById('quiz-tiles');
+  tilesEl.querySelectorAll('.quiz-tile').forEach(btn => {
+    btn.disabled = true;
+    const n = parseInt(btn.dataset.n, 10);
+    if (n === correct.n) {
+      btn.classList.add('correct');
+    } else if (n === chosen.n && !isCorrect) {
+      btn.classList.add('wrong');
+    }
+  });
+
+  if (isCorrect) correctCount++;
+  answered++;
+  quizIndex++;
+
+  /* Auto-advance after 5 seconds */
+  quizTimer = setTimeout(() => {
+    renderQuestion();
+  }, 5000);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   START — napojení na LED API
+═══════════════════════════════════════════════════════════ */
+initApi();
+</script>
+</body>
+</html>
